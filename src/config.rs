@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::{collections::HashSet, io};
 use thiserror::Error;
 use toml;
+use toml_edit::{self, Array, DocumentMut, Item, Table};
 
 use lan_mouse_cli::CliArgs;
 use lan_mouse_ipc::{Position, DEFAULT_PORT};
@@ -44,7 +45,7 @@ fn default_path() -> Result<PathBuf, VarError> {
     Ok(PathBuf::from(default_path))
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct ConfigToml {
     capture_backend: Option<CaptureBackend>,
     emulation_backend: Option<EmulationBackend>,
@@ -431,7 +432,24 @@ impl Config {
             .authorized_fingerprints = Some(fingerprints);
     }
 
-    pub fn write_back(&self) {
-        todo!()
+    pub fn write_back(&self) -> Result<(), io::Error> {
+        log::info!("writing config to {:?}", &self.config_path);
+        /* load the current configuration file */
+        let current_config = fs::read_to_string(&self.config_path)?;
+        let current_config = current_config.parse::<DocumentMut>().expect("fix me");
+        let _current_config =
+            toml_edit::de::from_document::<ConfigToml>(current_config).expect("fixme");
+
+        /* the new config */
+        let new_config = self.config_toml.clone().unwrap_or_default();
+        // let new_config = toml_edit::ser::to_document::<ConfigToml>(&new_config).expect("fixme");
+        let new_config = toml_edit::ser::to_string_pretty(&new_config).expect("todo");
+
+        /* TODO merge documents */
+
+        /* write new config to file */
+        fs::write(&self.config_path, new_config)?;
+
+        Ok(())
     }
 }
